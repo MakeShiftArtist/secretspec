@@ -37,6 +37,7 @@ linkme.workspace = true
 secrecy.workspace = true
 google-cloud-secretmanager-v1 = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
+base64.workspace = true
 
 [features]
 default = ["cli", "keyring"]

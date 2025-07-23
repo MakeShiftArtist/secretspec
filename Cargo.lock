@@ -1931,6 +1931,7 @@ dependencies = [
 name = "secretspec"
 version = "0.5.1"
 dependencies = [
+ "base64",
  "clap",
  "colored",
  "directories",

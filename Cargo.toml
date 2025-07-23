@@ -39,6 +39,7 @@ google-cloud-secretmanager-v1 = "1.2"
 tokio = { version = "1", features = ["rt"] }
 secretspec-derive = { version = "0.5.1", path = "./secretspec-derive" }
 secretspec = { version = "0.5.1", path = "./secretspec" }
+base64 = "0.22"
 
 # The profile that 'dist' will build with
 [profile.dist]
