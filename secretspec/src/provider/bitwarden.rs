@@ -97,6 +97,7 @@ impl BitwardenItemType {
                 } else if hint_lower.contains("passphrase") || hint_lower.contains("password") {
                     "passphrase".to_string()
                 } else if hint_lower.contains("private") || hint_lower.contains("key") {
+                    #[allow(clippy::if_same_then_else)]
                     "private_key".to_string()
                 } else {
                     "private_key".to_string() // Default for SSH Key items
