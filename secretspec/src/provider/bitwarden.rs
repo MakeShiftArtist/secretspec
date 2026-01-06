@@ -44,8 +44,8 @@ impl BitwardenItemType {
     }
 
     /// Convert to integer for JSON serialization
-    pub fn to_u8(&self) -> u8 {
-        *self as u8
+    pub fn to_u8(self) -> u8 {
+        self as u8
     }
 
     /// Get the default field name for this item type
@@ -153,8 +153,8 @@ impl BitwardenFieldType {
     }
 
     /// Convert to integer for JSON serialization
-    pub fn to_u8(&self) -> u8 {
-        *self as u8
+    pub fn to_u8(self) -> u8 {
+        self as u8
     }
 
     /// Get the appropriate field type for a field name
