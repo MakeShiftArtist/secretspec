@@ -985,7 +985,7 @@ impl BitwardenProvider {
             .map(|word| {
                 // Unix paths: /path/to/file
                 if word.starts_with('/') && word.matches('/').count() >= 2 {
-                    if let Some(filename) = word.split('/').last() {
+                    if let Some(filename) = word.split('/').next_back() {
                         if !filename.is_empty() {
                             format!(".../{filename}")
                         } else {
@@ -1001,7 +1001,7 @@ impl BitwardenProvider {
                     && word.chars().nth(2) == Some('\\'))
                     || word.starts_with("\\\\")
                 {
-                    if let Some(filename) = word.split('\\').last() {
+                    if let Some(filename) = word.split('\\').next_back() {
                         if !filename.is_empty() && filename != word {
                             format!("...\\{filename}")
                         } else {
