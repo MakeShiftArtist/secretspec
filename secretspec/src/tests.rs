@@ -1623,7 +1623,7 @@ fn test_import_between_dotenv_files() {
     // Import from source dotenv to target dotenv
     let from_provider = format!("dotenv://{}", source_env_path.display());
     let result = spec.import(&from_provider);
-    assert!(result.is_ok(), "Import should succeed: {:?}", result);
+    assert!(result.is_ok(), "Import should succeed: {result:?}");
 
     // Verify using dotenvy that the values are correct
     let vars: HashMap<String, String> = {
@@ -1747,8 +1747,7 @@ fn test_import_edge_cases() {
     let result = spec.import(&from_provider);
     assert!(
         result.is_ok(),
-        "Import should handle edge cases: {:?}",
-        result
+        "Import should handle edge cases: {result:?}",
     );
 
     // Verify using dotenvy that the values are correct
@@ -2180,7 +2179,7 @@ fn test_get_existing_secret() {
     );
 
     let result = spec.get("TEST_SECRET");
-    assert!(result.is_ok(), "Failed to get secret: {:?}", result);
+    assert!(result.is_ok(), "Failed to get secret: {result:?}");
 }
 
 #[test]
@@ -2350,7 +2349,7 @@ fn test_import_dotenv_profile_issue_36() {
             if target_env_path.exists() {
                 let target_contents = fs::read_to_string(&target_env_path).unwrap();
                 println!("Target file after import:");
-                println!("{}", target_contents);
+                println!("{target_contents}");
 
                 // The real bug: JWT_SECRET should be imported from .env
                 assert!(
@@ -2381,7 +2380,7 @@ fn test_import_dotenv_profile_issue_36() {
             }
         }
         Err(e) => {
-            panic!("Import should not fail: {:?}", e);
+            panic!("Import should not fail: {e:?}");
         }
     }
 
@@ -2754,7 +2753,7 @@ fn test_get_secret_with_fallback_chain() {
             let db_url = valid.resolved.secrets.get("DATABASE_URL").unwrap();
             assert_eq!(db_url.expose_secret(), "postgres://localhost");
         }
-        Err(e) => panic!("Validation should succeed: {:?}", e),
+        Err(e) => panic!("Validation should succeed: {e:?}"),
     }
 }
 
@@ -2883,7 +2882,7 @@ fn test_validate_with_per_secret_providers() {
             // No missing required secrets
             assert!(valid.missing_optional.is_empty());
         }
-        Err(e) => panic!("Validation should succeed: {:?}", e),
+        Err(e) => panic!("Validation should succeed: {e:?}"),
     }
 }
 
@@ -3145,10 +3144,10 @@ fn test_as_path_secrets() {
 
     // Create a dotenv file with a secret
     let env_file = temp_dir.path().join(".env");
-    fs::write(&env_file, format!("CERT_DATA={}", secret_value)).unwrap();
+    fs::write(&env_file, format!("CERT_DATA={secret_value}")).unwrap();
     fs::write(
         &env_file,
-        format!("CERT_DATA={}\nREGULAR_SECRET=not-a-path", secret_value),
+        format!("CERT_DATA={secret_value}\nREGULAR_SECRET=not-a-path"),
     )
     .unwrap();
 
@@ -3229,7 +3228,7 @@ fn test_as_path_secrets_keep_temp_files() {
 
     // Create a dotenv file with a secret
     let env_file = temp_dir.path().join(".env");
-    fs::write(&env_file, format!("CERT_DATA={}", secret_value)).unwrap();
+    fs::write(&env_file, format!("CERT_DATA={secret_value}")).unwrap();
 
     // Create config with as_path secret
     let config_file = temp_dir.path().join("secretspec.toml");
