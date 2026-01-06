@@ -3,7 +3,7 @@ use crate::{Result, SecretSpecError};
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use std::process::Command;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use url::Url;
 
 /// Bitwarden service type enum for distinguishing between Password Manager and Secrets Manager
@@ -1172,13 +1172,6 @@ impl BitwardenProvider {
     /// - Authentication required (not logged in or unlocked)
     /// - Command execution failures
     fn execute_bw_command(&self, args: &[&str]) -> Result<String> {
-        // Performance timing if enabled
-        let start_time = if std::env::var("SECRETSPEC_PERF_LOG").is_ok() {
-            Some(Instant::now())
-        } else {
-            None
-        };
-
         let mut cmd = Command::new("bw");
 
         // Configure server if specified
@@ -1221,18 +1214,6 @@ impl BitwardenProvider {
         let result = String::from_utf8(output.stdout).map_err(|e| {
             SecretSpecError::ProviderOperationFailed(self.sanitize_error_message(&e.to_string()))
         });
-
-        // Log performance timing if enabled
-        if let Some(start) = start_time {
-            let duration = start.elapsed();
-            eprintln!(
-                "[PERF] bw {} took {:?} ({}ms)",
-                args.join(" "),
-                duration,
-                duration.as_millis()
-            );
-        }
-
         result
     }
 
@@ -1261,13 +1242,6 @@ impl BitwardenProvider {
     /// - Rate limiting issues
     /// - Command execution failures
     fn execute_bws_command(&self, args: &[&str]) -> Result<String> {
-        // Performance timing if enabled
-        let start_time = if std::env::var("SECRETSPEC_PERF_LOG").is_ok() {
-            Some(Instant::now())
-        } else {
-            None
-        };
-
         let mut cmd = Command::new("bws");
 
         // Configure access token - check config first, then environment variable
@@ -1322,18 +1296,6 @@ impl BitwardenProvider {
         let result = String::from_utf8(output.stdout).map_err(|e| {
             SecretSpecError::ProviderOperationFailed(self.sanitize_error_message(&e.to_string()))
         });
-
-        // Log performance timing if enabled
-        if let Some(start) = start_time {
-            let duration = start.elapsed();
-            eprintln!(
-                "[PERF] bws {} took {:?} ({}ms)",
-                args.join(" "),
-                duration,
-                duration.as_millis()
-            );
-        }
-
         result
     }
 
@@ -1492,13 +1454,6 @@ impl BitwardenProvider {
         let items: Vec<BitwardenItem> = if output.trim().is_empty() {
             Vec::new()
         } else {
-            // Performance timing for JSON parsing (equivalent to jq processing)
-            let parse_start = if std::env::var("SECRETSPEC_PERF_LOG").is_ok() {
-                Some(std::time::Instant::now())
-            } else {
-                None
-            };
-
             let items: Vec<BitwardenItem> = serde_json::from_str(&output).map_err(|e| {
                 SecretSpecError::ProviderOperationFailed(format!(
                     "Failed to parse Bitwarden search results: {}. Output was: '{}'",
@@ -1506,17 +1461,6 @@ impl BitwardenProvider {
                     output.chars().take(100).collect::<String>()
                 ))
             })?;
-
-            // Log JSON parsing performance (equivalent to jq timing)
-            if let Some(start) = parse_start {
-                let duration = start.elapsed();
-                eprintln!(
-                    "[PERF] JSON parse took {}μs for {} items ({}B)",
-                    duration.as_micros(),
-                    items.len(),
-                    output.len()
-                );
-            }
 
             items
         };
@@ -1917,8 +1861,6 @@ impl BitwardenProvider {
         key: &str,
         _profile: &str,
     ) -> Result<Option<SecretString>> {
-        let perf_enabled = std::env::var("SECRETSPEC_PERF_LOG").is_ok();
-
         // For Secrets Manager, we create a secret name based on project and key
         // Profile is encoded in the secret name since SM doesn't have built-in profile support
         let secret_name = format!("{project}_{key}");
@@ -1931,33 +1873,9 @@ impl BitwardenProvider {
             args.push(project_id);
         }
 
-        let list_start = if perf_enabled {
-            Some(Instant::now())
-        } else {
-            None
-        };
         match self.execute_bws_command(&args) {
             Ok(output) => {
-                if let Some(start) = list_start {
-                    eprintln!(
-                        "[PERF] BWS secret list took {}ms",
-                        start.elapsed().as_millis()
-                    );
-                }
-
-                let parse_start = if perf_enabled {
-                    Some(Instant::now())
-                } else {
-                    None
-                };
                 let secrets: Vec<BitwardenSecret> = serde_json::from_str(&output)?;
-                if let Some(start) = parse_start {
-                    eprintln!(
-                        "[PERF] BWS JSON parse took {}μs, {} secrets",
-                        start.elapsed().as_micros(),
-                        secrets.len()
-                    );
-                }
 
                 // Look for a secret with matching key name
                 for secret in secrets {
@@ -2735,12 +2653,6 @@ impl Provider for BitwardenProvider {
     /// - Item retrieval failures
     /// - JSON parsing errors
     fn get(&self, project: &str, key: &str, profile: &str) -> Result<Option<SecretString>> {
-        let start_time = if std::env::var("SECRETSPEC_PERF_LOG").is_ok() {
-            Some(Instant::now())
-        } else {
-            None
-        };
-
         let result = match self.config.service {
             BitwardenService::PasswordManager => {
                 self.get_from_password_manager(project, key, profile)
@@ -2749,18 +2661,6 @@ impl Provider for BitwardenProvider {
                 self.get_from_secrets_manager(project, key, profile)
             }
         };
-
-        // Log performance timing if enabled
-        if let Some(start) = start_time {
-            let duration = start.elapsed();
-            eprintln!(
-                "[PERF] get('{}') took {:?} ({}ms)",
-                key,
-                duration,
-                duration.as_millis()
-            );
-        }
-
         result
     }
 
@@ -2787,12 +2687,6 @@ impl Provider for BitwardenProvider {
     /// - Item creation/update failures
     /// - Temporary file creation errors
     fn set(&self, project: &str, key: &str, value: &SecretString, profile: &str) -> Result<()> {
-        let start_time = if std::env::var("SECRETSPEC_PERF_LOG").is_ok() {
-            Some(Instant::now())
-        } else {
-            None
-        };
-
         let result = match self.config.service {
             BitwardenService::PasswordManager => {
                 self.set_to_password_manager(project, key, value, profile)
@@ -2801,18 +2695,6 @@ impl Provider for BitwardenProvider {
                 self.set_to_secrets_manager(project, key, value, profile)
             }
         };
-
-        // Log performance timing if enabled
-        if let Some(start) = start_time {
-            let duration = start.elapsed();
-            eprintln!(
-                "[PERF] set('{}') took {:?} ({}ms)",
-                key,
-                duration,
-                duration.as_millis()
-            );
-        }
-
         result
     }
 }
