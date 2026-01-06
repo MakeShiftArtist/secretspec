@@ -2704,6 +2704,13 @@ impl Provider for BitwardenProvider {
         Self::PROVIDER_NAME
     }
 
+    fn uri(&self) -> String {
+        match self.config.service {
+            BitwardenService::PasswordManager => String::from("bitwarden://"),
+            BitwardenService::SecretsManager => String::from("bws://"),
+        }
+    }
+
     /// Retrieves a secret from Bitwarden.
     ///
     /// Searches for an item with the name formatted according to the folder_prefix
