@@ -1076,8 +1076,7 @@ impl BitwardenProvider {
                     } else {
                         // If we can't store the handle, kill the child and return error
                         let _ = child.kill();
-                        let _ = tx.send(Err(std::io::Error::new(
-                            std::io::ErrorKind::Other,
+                        let _ = tx.send(Err(std::io::Error::other(
                             "Failed to manage process handle",
                         )));
                         return;
