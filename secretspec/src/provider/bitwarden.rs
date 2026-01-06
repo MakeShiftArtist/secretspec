@@ -252,7 +252,7 @@ where
 {
     let value = u8::deserialize(deserializer)?;
     BitwardenItemType::from_u8(value)
-        .ok_or_else(|| serde::de::Error::custom(format!("Unknown item type: {}", value)))
+        .ok_or_else(|| serde::de::Error::custom(format!("Unknown item type: {value}")))
 }
 
 /// Represents login data within a Bitwarden Login item.
@@ -368,7 +368,7 @@ where
 {
     let value = u8::deserialize(deserializer)?;
     BitwardenFieldType::from_u8(value)
-        .ok_or_else(|| serde::de::Error::custom(format!("Unknown field type: {}", value)))
+        .ok_or_else(|| serde::de::Error::custom(format!("Unknown field type: {value}")))
 }
 
 /// Template for creating new Bitwarden items via the CLI.
@@ -617,8 +617,7 @@ impl TryFrom<&Url> for BitwardenConfig {
             "bws" => BitwardenService::SecretsManager,
             _ => {
                 return Err(SecretSpecError::ProviderOperationFailed(format!(
-                    "Invalid scheme '{}' for Bitwarden provider. Use 'bitwarden://' for Password Manager or 'bws://' for Secrets Manager",
-                    scheme
+                    "Invalid scheme '{scheme}' for Bitwarden provider. Use 'bitwarden://' for Password Manager or 'bws://' for Secrets Manager",
                 )));
             }
         };
@@ -921,7 +920,7 @@ impl BitwardenProvider {
                         if end_pos >= 8 {
                             let before = &sanitized[..value_start + actual_value_start];
                             let after = &sanitized[value_start + actual_value_start + end_pos..];
-                            sanitized = format!("{}{}{}", before, replacement, after);
+                            sanitized = format!("{before}{replacement}{after}");
                         }
                     }
                 }
@@ -941,7 +940,7 @@ impl BitwardenProvider {
                     // Typical token length
                     let before = &sanitized[..token_start];
                     let after = &sanitized[token_start + token_end..];
-                    sanitized = format!("{}[REDACTED]{}", before, after);
+                    sanitized = format!("{before}[REDACTED]{after}");
                 }
             }
         }
@@ -987,7 +986,7 @@ impl BitwardenProvider {
                 if word.starts_with('/') && word.matches('/').count() >= 2 {
                     if let Some(filename) = word.split('/').last() {
                         if !filename.is_empty() {
-                            format!(".../{}", filename)
+                            format!(".../{filename}")
                         } else {
                             "[PATH_REDACTED]".to_string()
                         }
@@ -1003,7 +1002,7 @@ impl BitwardenProvider {
                 {
                     if let Some(filename) = word.split('\\').last() {
                         if !filename.is_empty() && filename != word {
-                            format!("...\\{}", filename)
+                            format!("...\\{filename}")
                         } else {
                             "[PATH_REDACTED]".to_string()
                         }
@@ -1119,8 +1118,7 @@ impl BitwardenProvider {
                     ))
                 } else {
                     Err(SecretSpecError::ProviderOperationFailed(format!(
-                        "Command execution failed: {}",
-                        e
+                        "Command execution failed: {e}",
                     )))
                 }
             }
@@ -1408,7 +1406,7 @@ impl BitwardenProvider {
     /// A formatted string like "secretspec/{project}/{profile}/{key}"
     fn format_item_name(&self, project: &str, key: &str, profile: &str) -> String {
         let folder = self.format_folder_name(project, profile);
-        format!("{}/{}", folder, key)
+        format!("{folder}/{key}")
     }
 
     /// Creates a template for a new Bitwarden item.
@@ -1438,7 +1436,7 @@ impl BitwardenProvider {
         let template = BitwardenItemTemplate {
             item_type: BitwardenItemType::Login,
             name: key.to_string(),
-            notes: format!("SecretSpec managed secret: {}", key),
+            notes: format!("SecretSpec managed secret: {key}"),
             login: Some(BitwardenLogin {
                 username: None,
                 password: Some(value.to_string()),
@@ -1926,7 +1924,7 @@ impl BitwardenProvider {
 
         // For Secrets Manager, we create a secret name based on project and key
         // Profile is encoded in the secret name since SM doesn't have built-in profile support
-        let secret_name = format!("{}_{}", project, key);
+        let secret_name = format!("{project}_{key}");
 
         // First, try to list all secrets to find the one we want
         let mut args = vec!["secret", "list"];
@@ -2321,7 +2319,7 @@ impl BitwardenProvider {
         use std::io::Write;
         if let Some(stdin) = child.stdin.as_mut() {
             stdin.write_all(encoded_json.as_bytes()).map_err(|e| {
-                SecretSpecError::ProviderOperationFailed(format!("Failed to write to stdin: {}", e))
+                SecretSpecError::ProviderOperationFailed(format!("Failed to write to stdin: {e}"))
             })?;
         }
 
@@ -2484,7 +2482,7 @@ impl BitwardenProvider {
         let template = serde_json::json!({
             "type": BitwardenItemType::SecureNote.to_u8(),
             "name": key,
-            "notes": if target_field == "notes" { value.to_string() } else { format!("SecretSpec managed secret: {}", key) },
+            "notes": if target_field == "notes" { value.to_string() } else { format!("SecretSpec managed secret: {key}") },
             "secureNote": {
                 "type": 0
             },
@@ -2609,7 +2607,7 @@ impl BitwardenProvider {
         use std::io::Write;
         if let Some(stdin) = child.stdin.as_mut() {
             stdin.write_all(encoded_json.as_bytes()).map_err(|e| {
-                SecretSpecError::ProviderOperationFailed(format!("Failed to write to stdin: {}", e))
+                SecretSpecError::ProviderOperationFailed(format!("Failed to write to stdin: {e}"))
             })?;
         }
 
@@ -2636,7 +2634,7 @@ impl BitwardenProvider {
         _profile: &str,
     ) -> Result<()> {
         // For Secrets Manager, we create a secret name based on project and key
-        let secret_name = format!("{}_{}", project, key);
+        let secret_name = format!("{project}_{key}");
 
         // Check if we have a required project_id
         let project_id = self.config.project_id.as_ref().ok_or_else(|| {
@@ -2646,7 +2644,7 @@ impl BitwardenProvider {
         })?;
 
         // Try to create the secret first (it will fail if it exists)
-        let note = format!("SecretSpec managed secret: {}/{}", project, key);
+        let note = format!("SecretSpec managed secret: {project}/{key}");
         let create_args = vec![
             "secret",
             "create",
