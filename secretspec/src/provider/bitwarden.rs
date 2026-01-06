@@ -1211,10 +1211,9 @@ impl BitwardenProvider {
             ));
         }
 
-        let result = String::from_utf8(output.stdout).map_err(|e| {
+        String::from_utf8(output.stdout).map_err(|e| {
             SecretSpecError::ProviderOperationFailed(self.sanitize_error_message(&e.to_string()))
-        });
-        result
+        })
     }
 
     /// Executes a Bitwarden Secrets Manager CLI command with proper error handling.
@@ -1293,10 +1292,9 @@ impl BitwardenProvider {
             )));
         }
 
-        let result = String::from_utf8(output.stdout).map_err(|e| {
+        String::from_utf8(output.stdout).map_err(|e| {
             SecretSpecError::ProviderOperationFailed(self.sanitize_error_message(&e.to_string()))
-        });
-        result
+        })
     }
 
     /// Checks if the user is authenticated with Bitwarden.
@@ -2653,15 +2651,14 @@ impl Provider for BitwardenProvider {
     /// - Item retrieval failures
     /// - JSON parsing errors
     fn get(&self, project: &str, key: &str, profile: &str) -> Result<Option<SecretString>> {
-        let result = match self.config.service {
+        match self.config.service {
             BitwardenService::PasswordManager => {
                 self.get_from_password_manager(project, key, profile)
             }
             BitwardenService::SecretsManager => {
                 self.get_from_secrets_manager(project, key, profile)
             }
-        };
-        result
+        }
     }
 
     /// Stores or updates a secret in Bitwarden.
@@ -2687,15 +2684,14 @@ impl Provider for BitwardenProvider {
     /// - Item creation/update failures
     /// - Temporary file creation errors
     fn set(&self, project: &str, key: &str, value: &SecretString, profile: &str) -> Result<()> {
-        let result = match self.config.service {
+        match self.config.service {
             BitwardenService::PasswordManager => {
                 self.set_to_password_manager(project, key, value, profile)
             }
             BitwardenService::SecretsManager => {
                 self.set_to_secrets_manager(project, key, value, profile)
             }
-        };
-        result
+        }
     }
 }
 
