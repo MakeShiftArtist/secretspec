@@ -1188,14 +1188,14 @@ impl BitwardenProvider {
 
         cmd.args(args);
 
-        let output = self.execute_command_with_timeout(cmd).or_else(|e| {
+        let output = self.execute_command_with_timeout(cmd).map_err(|e| {
             // Provide more specific error message for CLI not found
             if e.to_string().contains("not installed") {
-                return Err(SecretSpecError::ProviderOperationFailed(
+                return SecretSpecError::ProviderOperationFailed(
                     "Bitwarden CLI (bw) is not installed.\n\nTo install it:\n  - npm: npm install -g @bitwarden/cli\n  - Homebrew: brew install bitwarden-cli\n  - Chocolatey: choco install bitwarden-cli\n  - Download: https://bitwarden.com/help/cli/\n\nAfter installation, run 'bw login' and 'bw unlock' to authenticate.".to_string(),
-                ));
+                );
             }
-            Err(e)
+            e
         })?;
 
         if !output.status.success() {
@@ -1279,14 +1279,14 @@ impl BitwardenProvider {
 
         cmd.args(args);
 
-        let output = self.execute_command_with_timeout(cmd).or_else(|e| {
+        let output = self.execute_command_with_timeout(cmd).map_err(|e| {
             // Provide more specific error message for CLI not found
             if e.to_string().contains("not installed") {
-                return Err(SecretSpecError::ProviderOperationFailed(
+                return SecretSpecError::ProviderOperationFailed(
                     "Bitwarden Secrets Manager CLI (bws) is not installed.\n\nTo install it:\n  - Cargo: cargo install bws\n  - Script: curl -sSL https://bitwarden.com/secrets/install | sh\n  - Download: https://github.com/bitwarden/sdk-sm/releases\n\nAfter installation, set BWS_ACCESS_TOKEN environment variable with your access token.".to_string(),
-                ));
+                );
             }
-            Err(e)
+            e
         })?;
 
         if !output.status.success() {
