@@ -1083,8 +1083,7 @@ impl BitwardenProvider {
                     }
 
                     // Get the child from the mutex to wait for it
-                    let child = process_handle_clone.lock().unwrap().take().unwrap();
-                    child
+                    process_handle_clone.lock().unwrap().take().unwrap()
                 }
                 Err(e) => {
                     let _ = tx.send(Err(e));
@@ -1433,7 +1432,7 @@ impl BitwardenProvider {
         _profile: &str,
     ) -> BitwardenItemTemplate {
         // Create a Login item by default - better for script compatibility
-        let template = BitwardenItemTemplate {
+        BitwardenItemTemplate {
             item_type: BitwardenItemType::Login,
             name: key.to_string(),
             notes: format!("SecretSpec managed secret: {key}"),
@@ -1455,9 +1454,7 @@ impl BitwardenProvider {
                 .ok()
                 .or_else(|| self.config.collection_id.clone())
                 .map(|id| vec![id]),
-        };
-
-        template
+        }
     }
 
     /// Gets a secret from Bitwarden Password Manager.
