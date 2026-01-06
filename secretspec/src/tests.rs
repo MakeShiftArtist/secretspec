@@ -23,7 +23,7 @@ fn parse_spec_from_str(content: &str, _base_path: Option<&Path>) -> Result<Confi
         ));
     }
 
-    config.validate().map_err(|e| SecretSpecError::from(e))?;
+    config.validate().map_err(SecretSpecError::from)?;
 
     Ok(config)
 }
