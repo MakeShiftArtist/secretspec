@@ -807,226 +807,6 @@ impl BitwardenProvider {
         Duration::from_secs(timeout_secs)
     }
 
-    /// Sanitizes CLI error messages to prevent secret leakage.
-    ///
-    /// This method removes or redacts potential secrets from error messages while
-    /// preserving useful diagnostic information for users.
-    ///
-    /// # Security Considerations
-    ///
-    /// CLI error messages can sometimes contain:
-    /// - Access tokens or session keys in curl/HTTP error messages
-    /// - Secret values in JSON parsing errors
-    /// - File paths that might reveal sensitive information
-    /// - Command arguments that contain secrets
-    ///
-    /// # Arguments
-    ///
-    /// * `error_msg` - The raw error message from CLI stderr
-    ///
-    /// # Returns
-    ///
-    /// A sanitized error message safe for logging and user display
-    pub(crate) fn sanitize_error_message(&self, error_msg: &str) -> String {
-        let mut sanitized = error_msg.to_string();
-
-        // Redact file paths first to avoid false positives with secret patterns
-        sanitized = self.redact_file_paths(sanitized);
-        sanitized = self.redact_secret_patterns(sanitized);
-        sanitized = self.redact_bearer_tokens(sanitized);
-        sanitized = self.redact_base64_tokens(sanitized);
-        sanitized = self.truncate_long_message(sanitized);
-
-        sanitized
-    }
-
-    /// Redacts potential secret patterns in JSON/key-value formats.
-    pub(crate) fn redact_secret_patterns(&self, mut sanitized: String) -> String {
-        let secret_patterns = [
-            // JSON patterns: "token": "value", "key": "value"
-            ("\"token\":", "\"[REDACTED]\""),
-            ("\"key\":", "\"[REDACTED]\""),
-            ("\"secret\":", "\"[REDACTED]\""),
-            ("\"password\":", "\"[REDACTED]\""),
-            ("\"session\":", "\"[REDACTED]\""),
-            ("\"access_token\":", "\"[REDACTED]\""),
-            ("\"api_key\":", "\"[REDACTED]\""),
-            ("\"authorization\":", "\"[REDACTED]\""),
-            ("\"bearer\":", "\"[REDACTED]\""),
-            ("\"jwt\":", "\"[REDACTED]\""),
-            ("\"refresh_token\":", "\"[REDACTED]\""),
-            ("\"client_secret\":", "\"[REDACTED]\""),
-            ("\"private_key\":", "\"[REDACTED]\""),
-            ("\"client_id\":", "\"[REDACTED]\""),
-            // URL/form patterns: token=value, key=value
-            ("token=", "token=[REDACTED]"),
-            ("key=", "key=[REDACTED]"),
-            ("secret=", "secret=[REDACTED]"),
-            ("password=", "password=[REDACTED]"),
-            ("session=", "session=[REDACTED]"),
-            ("access_token=", "access_token=[REDACTED]"),
-            ("api_key=", "api_key=[REDACTED]"),
-            ("authorization=", "authorization=[REDACTED]"),
-            ("bearer=", "bearer=[REDACTED]"),
-            ("jwt=", "jwt=[REDACTED]"),
-            ("refresh_token=", "refresh_token=[REDACTED]"),
-            ("client_secret=", "client_secret=[REDACTED]"),
-            ("private_key=", "private_key=[REDACTED]"),
-            ("client_id=", "client_id=[REDACTED]"),
-            // Error message patterns: "token: value", "key: value"
-            ("token: ", "token: [REDACTED]"),
-            ("key: ", "key: [REDACTED]"),
-            ("secret: ", "secret: [REDACTED]"),
-            ("password: ", "password: [REDACTED]"),
-            ("session: ", "session: [REDACTED]"),
-            ("access_token: ", "access_token: [REDACTED]"),
-            ("api_key: ", "api_key: [REDACTED]"),
-            ("authorization: ", "authorization: [REDACTED]"),
-            ("bearer: ", "bearer: [REDACTED]"),
-            ("jwt: ", "jwt: [REDACTED]"),
-            ("refresh_token: ", "refresh_token: [REDACTED]"),
-            ("client_secret: ", "client_secret: [REDACTED]"),
-            ("private_key: ", "private_key: [REDACTED]"),
-            ("client_id: ", "client_id: [REDACTED]"),
-        ];
-
-        for (pattern, replacement) in &secret_patterns {
-            if let Some(start) = sanitized.to_lowercase().find(&pattern.to_lowercase()) {
-                let value_start = start + pattern.len();
-                if let Some(value_part) = sanitized.get(value_start..) {
-                    // Skip whitespace and quotes to get to the actual value
-                    let mut actual_value_start = 0;
-                    for (i, ch) in value_part.char_indices() {
-                        if ch != ' ' && ch != '"' {
-                            actual_value_start = i;
-                            break;
-                        }
-                    }
-
-                    if let Some(actual_value) = value_part.get(actual_value_start..) {
-                        // Find end of value (quote, comma, newline, brace, bracket)
-                        // Don't break on spaces for values like "Bearer token123"
-                        let end_chars = ['"', ',', '\n', '\r', '}', ']'];
-                        let mut end_pos = actual_value.len();
-
-                        for &end_char in &end_chars {
-                            if let Some(pos) = actual_value.find(end_char) {
-                                if pos < end_pos {
-                                    end_pos = pos;
-                                }
-                            }
-                        }
-
-                        // Only redact if value looks like a secret (>= 8 chars)
-                        if end_pos >= 8 {
-                            let before = &sanitized[..value_start + actual_value_start];
-                            let after = &sanitized[value_start + actual_value_start + end_pos..];
-                            sanitized = format!("{before}{replacement}{after}");
-                        }
-                    }
-                }
-            }
-        }
-
-        sanitized
-    }
-
-    /// Redacts Bearer tokens from error messages.
-    pub(crate) fn redact_bearer_tokens(&self, mut sanitized: String) -> String {
-        if let Some(bearer_start) = sanitized.to_lowercase().find("bearer ") {
-            let token_start = bearer_start + 7;
-            if let Some(token_part) = sanitized.get(token_start..) {
-                let token_end = token_part.find(' ').unwrap_or(token_part.len().min(60));
-                if token_end >= 20 {
-                    // Typical token length
-                    let before = &sanitized[..token_start];
-                    let after = &sanitized[token_start + token_end..];
-                    sanitized = format!("{before}[REDACTED]{after}");
-                }
-            }
-        }
-        sanitized
-    }
-
-    /// Redacts long base64-like strings (potential tokens/keys).
-    pub(crate) fn redact_base64_tokens(&self, sanitized: String) -> String {
-        let words: Vec<String> = sanitized
-            .split_whitespace()
-            .map(|word| {
-                // Check for JWT pattern (base64.base64.base64 or base64.base64)
-                if word.contains('.') && word.len() >= 20 {
-                    let parts: Vec<&str> = word.split('.').collect();
-                    if parts.len() >= 2 && parts.iter().all(|part| {
-                        part.len() >= 4 && part.chars().all(|c| c.is_alphanumeric() || c == '+' || c == '/' || c == '=' || c == '-' || c == '_')
-                    }) {
-                        return "[REDACTED]".to_string();
-                    }
-                }
-
-                // Check for regular base64-like strings
-                if word.len() >= 20
-                   && word.chars().all(|c| c.is_alphanumeric() || c == '+' || c == '/' || c == '=' || c == '-' || c == '_')
-                   && !word.chars().all(|c| c.is_ascii_digit()) // Don't redact pure numbers
-                   && !word.chars().all(|c| c == word.chars().next().unwrap()) // Don't redact repeated chars
-                {
-                    "[REDACTED]".to_string()
-                } else {
-                    word.to_string()
-                }
-            })
-            .collect();
-        words.join(" ")
-    }
-
-    /// Redacts sensitive file paths while preserving filenames for debugging.
-    pub(crate) fn redact_file_paths(&self, sanitized: String) -> String {
-        let words: Vec<String> = sanitized
-            .split_whitespace()
-            .map(|word| {
-                // Unix paths: /path/to/file
-                if word.starts_with('/') && word.matches('/').count() >= 2 {
-                    if let Some(filename) = word.split('/').next_back() {
-                        if !filename.is_empty() {
-                            format!(".../{filename}")
-                        } else {
-                            "[PATH_REDACTED]".to_string()
-                        }
-                    } else {
-                        "[PATH_REDACTED]".to_string()
-                    }
-                }
-                // Windows paths: C:\path\to\file or \\server\share\file
-                else if (word.len() >= 3
-                    && word.chars().nth(1) == Some(':')
-                    && word.chars().nth(2) == Some('\\'))
-                    || word.starts_with("\\\\")
-                {
-                    if let Some(filename) = word.split('\\').next_back() {
-                        if !filename.is_empty() && filename != word {
-                            format!("...\\{filename}")
-                        } else {
-                            "[PATH_REDACTED]".to_string()
-                        }
-                    } else {
-                        "[PATH_REDACTED]".to_string()
-                    }
-                } else {
-                    word.to_string()
-                }
-            })
-            .collect();
-        words.join(" ")
-    }
-
-    /// Truncates overly long error messages for security and readability.
-    pub(crate) fn truncate_long_message(&self, mut sanitized: String) -> String {
-        if sanitized.len() > 500 {
-            sanitized.truncate(450);
-            sanitized.push_str("... [truncated for security]");
-        }
-        sanitized
-    }
-
     /// Executes a command with timeout using cross-platform approach.
     ///
     /// This method implements proper timeout handling using threads and channels
@@ -1207,13 +987,12 @@ impl BitwardenProvider {
             }
 
             return Err(SecretSpecError::ProviderOperationFailed(
-                self.sanitize_error_message(&error_msg),
+                error_msg.to_string(),
             ));
         }
 
-        String::from_utf8(output.stdout).map_err(|e| {
-            SecretSpecError::ProviderOperationFailed(self.sanitize_error_message(&e.to_string()))
-        })
+        String::from_utf8(output.stdout)
+            .map_err(|e| SecretSpecError::ProviderOperationFailed(e.to_string()))
     }
 
     /// Executes a Bitwarden Secrets Manager CLI command with proper error handling.
@@ -1288,13 +1067,12 @@ impl BitwardenProvider {
 
             return Err(SecretSpecError::ProviderOperationFailed(format!(
                 "Bitwarden Secrets Manager CLI error: {}",
-                self.sanitize_error_message(&error_msg)
+                error_msg
             )));
         }
 
-        String::from_utf8(output.stdout).map_err(|e| {
-            SecretSpecError::ProviderOperationFailed(self.sanitize_error_message(&e.to_string()))
-        })
+        String::from_utf8(output.stdout)
+            .map_err(|e| SecretSpecError::ProviderOperationFailed(e.to_string()))
     }
 
     /// Checks if the user is authenticated with Bitwarden.
@@ -2224,7 +2002,7 @@ impl BitwardenProvider {
                     "Bitwarden CLI (bw) is not installed.\n\nTo install it:\n  - npm: npm install -g @bitwarden/cli\n  - Homebrew: brew install bitwarden-cli\n  - Chocolatey: choco install bitwarden-cli\n  - Download: https://bitwarden.com/help/cli/".to_string(),
                 )
             } else {
-                SecretSpecError::ProviderOperationFailed(self.sanitize_error_message(&e.to_string()))
+                SecretSpecError::ProviderOperationFailed(e.to_string())
             }
         })?;
 
@@ -2243,7 +2021,7 @@ impl BitwardenProvider {
         if !output.status.success() {
             let error_msg = String::from_utf8_lossy(&output.stderr);
             return Err(SecretSpecError::ProviderOperationFailed(
-                self.sanitize_error_message(&error_msg),
+                error_msg.to_string(),
             ));
         }
 
@@ -2512,7 +2290,7 @@ impl BitwardenProvider {
                     "Bitwarden CLI (bw) is not installed.\n\nTo install it:\n  - npm: npm install -g @bitwarden/cli\n  - Homebrew: brew install bitwarden-cli\n  - Chocolatey: choco install bitwarden-cli\n  - Download: https://bitwarden.com/help/cli/".to_string(),
                 )
             } else {
-                SecretSpecError::ProviderOperationFailed(self.sanitize_error_message(&e.to_string()))
+                SecretSpecError::ProviderOperationFailed(e.to_string())
             }
         })?;
 
@@ -2531,7 +2309,7 @@ impl BitwardenProvider {
         if !output.status.success() {
             let error_msg = String::from_utf8_lossy(&output.stderr);
             return Err(SecretSpecError::ProviderOperationFailed(
-                self.sanitize_error_message(&error_msg),
+                error_msg.to_string(),
             ));
         }
 
