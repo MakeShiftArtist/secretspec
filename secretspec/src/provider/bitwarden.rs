@@ -1066,8 +1066,7 @@ impl BitwardenProvider {
             }
 
             return Err(SecretSpecError::ProviderOperationFailed(format!(
-                "Bitwarden Secrets Manager CLI error: {}",
-                error_msg
+                "Bitwarden Secrets Manager CLI error: {error_msg}",
             )));
         }
 
